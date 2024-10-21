@@ -60,8 +60,13 @@ func ValidasiTabungan(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
+func getHelloWorld(w http.ResponseWriter, r *http.Request){
+	fmt.Fprintf(w, "hello wordld")
+}
+
 func main() {
 	http.HandleFunc("/validasi-tabungan", ValidasiTabungan)
-	fmt.Println("Server berjalan di http://localhost:8080")
-	http.ListenAndServe(":8080", nil)
+	http.HandleFunc("/get", getHelloWorld)
+	fmt.Println("Server berjalan di http://localhost:9393")
+	http.ListenAndServe(":9393", nil)
 }
