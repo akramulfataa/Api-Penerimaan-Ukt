@@ -25,6 +25,8 @@ type Respon struct {
 	Tabungan string `json:"tabungan"`
 }
 
+var res []Respon
+
 func HitungTotalTabunganHarian(tabunganHarian int) int {
 	return tabunganHarian * (Bulan * HariPerBulan)
 }
