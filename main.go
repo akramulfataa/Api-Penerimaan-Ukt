@@ -3,7 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
+
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -60,13 +63,22 @@ func ValidasiTabungan(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-func getHelloWorld(w http.ResponseWriter, r *http.Request){
-	fmt.Fprintf(w, "hello wordld")
+func getTabungan(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
 }
 
 func main() {
+
+	err := godotenv.Load()
+	if err != nil {
+		slog.Error("load env error %v\n", err)
+		return
+	}
+
 	http.HandleFunc("/validasi-tabungan", ValidasiTabungan)
-	http.HandleFunc("/get", getHelloWorld)
-	fmt.Println("Server berjalan di http://localhost:9393")
+	http.HandleFunc("/get-tabugan", getTabungan)
+	fmt.Println("Server berjalan di port 9393")
+
 	http.ListenAndServe(":9393", nil)
 }
