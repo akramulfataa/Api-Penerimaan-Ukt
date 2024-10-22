@@ -1,0 +1,14 @@
+POST http://localhost:9393/validasi-tabungan
+Content-Type: application/json
+
+{
+    "tabungan_harian": 20000
+}
+
+
+POST http://localhost:9393/validasi-tabungan
+Content-Type: application/json
+
+{
+  "tabungan_harian": 40000
+}
