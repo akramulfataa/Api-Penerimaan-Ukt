@@ -3,10 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
-
-	"github.com/joho/godotenv"
+	"strconv"
+	"sync"
 )
 
 const (
@@ -20,12 +19,17 @@ type Permintaan struct {
 }
 
 type Respon struct {
+	ID       int    `json:"id"`
 	Layak    bool   `json:"layak"`
 	Pesan    string `json:"pesan"`
 	Tabungan string `json:"tabungan"`
 }
 
-var res []Respon
+var (
+	dataValidasi = make(map[int]Respon)
+	mu           sync.Mutex
+	idCounter    int
+)
 
 func HitungTotalTabunganHarian(tabunganHarian int) int {
 	return tabunganHarian * (Bulan * HariPerBulan)
@@ -51,13 +55,18 @@ func ValidasiTabungan(w http.ResponseWriter, r *http.Request) {
 		Tabungan: FormatRupiah(totalTabungan),
 	}
 
-	// Validasi apakah pengguna layak atau tidak berdasarkan total tabungan
+	mu.Lock()
+	idCounter++
+	res.ID = idCounter
+	dataValidasi[res.ID] = res
+	defer mu.Unlock()
+
 	if totalTabungan >= UKTMax {
 		res.Layak = false
-		res.Pesan = "Anda tidak layak menerima bantuan UKT karena total tabungan harian melebihi batas Rp5 juta."
+		res.Pesan = fmt.Sprintf("anda tidak layak menerima bantuan ukt karena total tabungan harian melebihi batas rp5 juta.")
 	} else {
 		res.Layak = true
-		res.Pesan = "Anda layak menerima bantuan UKT."
+		res.Pesan = fmt.Sprintf("Anda layak menerima bantuan UKT.")
 	}
 
 	// Kirimkan response
@@ -66,20 +75,58 @@ func ValidasiTabungan(w http.ResponseWriter, r *http.Request) {
 }
 
 func getTabungan(w http.ResponseWriter, r *http.Request) {
+
+	mu.Lock()
+	var semuaHasil []Respon
+	for _, res := range dataValidasi {
+		semuaHasil = append(semuaHasil, res)
+	}
+	defer mu.Unlock()
+	// Kirimkan seluruh hasil validasi
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(res)
+	json.NewEncoder(w).Encode(semuaHasil)
+
+}
+
+func deleteTabungan(w http.ResponseWriter, r *http.Request) {
+	// Ambil ID pengguna dari query string
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		http.Error(w, "Parameter 'id' diperlukan", http.StatusBadRequest)
+		return
+	}
+
+	// Konversi ID dari string ke int
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Nilai 'id' tidak valid", http.StatusBadRequest)
+		return
+	}
+
+	// Hapus hasil validasi dari map
+	mu.Lock()
+	_, ok := dataValidasi[id]
+	if ok {
+		delete(dataValidasi, id)
+	}
+	defer mu.Unlock()
+
+	if !ok {
+		http.Error(w, "Hasil validasi tidak ditemukan untuk ID tersebut", http.StatusNotFound)
+		return
+	}
+
+	// Kirimkan respons sukses
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Hasil validasi dengan ID %d berhasil dihapus.", id)
+
 }
 
 func main() {
 
-	err := godotenv.Load()
-	if err != nil {
-		slog.Error("load env error %v\n", err)
-		return
-	}
-
-	http.HandleFunc("/validasi-tabungan", ValidasiTabungan)
-	http.HandleFunc("/get-tabugan", getTabungan)
+	http.HandleFunc("/tabungan", ValidasiTabungan)
+	http.HandleFunc("/tabungans", getTabungan)
+	http.HandleFunc("/delete-tabungan", deleteTabungan)
 	fmt.Println("Server berjalan di port 9393")
 
 	http.ListenAndServe(":9393", nil)
